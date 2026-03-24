@@ -3,20 +3,24 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DeleteResult, EntityManager } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { InjectEntityManager } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreateProductDto, ProductDetailsDto } from '../dto/product.dto';
 import { Category } from '../../../database/entities/category.entity';
 import { Product } from 'src/database/entities/product.entity';
 import { errorMessages } from 'src/errors/custom';
 import { validate } from 'class-validator';
 import { successObject } from 'src/common/helper/sucess-response.interceptor';
+import { ProductCreatedEvent } from '../events/product-created.event';
+import { ProductActivatedEvent } from '../events/product-activated.event';
 
 @Injectable()
 export class ProductService {
   constructor(
     @InjectEntityManager()
     private readonly entityManager: EntityManager,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async getProduct(productId: number) {
@@ -45,7 +49,14 @@ export class ProductService {
       merchantId,
     });
 
-    return this.entityManager.save(product);
+    const savedProduct = await this.entityManager.save(product);
+
+    this.eventEmitter.emit(
+      'product.created',
+      new ProductCreatedEvent(savedProduct, merchantId),
+    );
+
+    return savedProduct;
   }
 
   async addProductDetails(
@@ -82,6 +93,16 @@ export class ProductService {
       .andWhere('merchantId = :merchantId', { merchantId })
       .returning(['id', 'isActive'])
       .execute();
+
+    if (result.affected < 1)
+      throw new NotFoundException(errorMessages.product.notFound);
+
+    const product = await this.getProduct(productId);
+
+    this.eventEmitter.emit(
+      'product.activated',
+      new ProductActivatedEvent(product, merchantId),
+    );
 
     return result.raw[0];
   }
