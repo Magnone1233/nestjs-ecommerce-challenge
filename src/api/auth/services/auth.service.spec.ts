@@ -15,16 +15,17 @@ describe('AuthService', () => {
   let fakeUserService: Partial<UserService>;
   let fakeRoleService: Partial<RoleService>;
 
-  const newUser = {
-    id: 1,
-    email: 'testuser@example.com',
-    password: 'password',
-  } as User;
-
   const customerRole = {
     id: RoleIds.Customer,
     name: Roles.Customer,
   } as Role;
+
+  const newUser = {
+    id: 1,
+    email: 'testuser@example.com',
+    password: 'password',
+    roles: [customerRole],
+  } as User;
 
   beforeEach(async () => {
     fakeUserService = {
@@ -112,6 +113,15 @@ describe('AuthService', () => {
         password: 'password',
       });
       expect(result).toHaveProperty('accessToken');
+
+      const payload = await service['jwtService'].verifyAsync(
+        result.accessToken,
+        {
+          secret: process.env.JWT_SECRET,
+        },
+      );
+
+      expect(payload.roleIds).toStrictEqual([RoleIds.Customer]);
     });
 
     it('should throw error if not registered', async () => {
@@ -143,8 +153,18 @@ describe('AuthService', () => {
       const result = await service.generateToken({
         email: 'email',
         id: 1,
+        roleIds: [RoleIds.Customer],
       });
       expect(result).toHaveProperty('accessToken');
+
+      const payload = await service['jwtService'].verifyAsync(
+        result.accessToken,
+        {
+          secret: process.env.JWT_SECRET,
+        },
+      );
+
+      expect(payload.roleIds).toStrictEqual([RoleIds.Customer]);
     });
   });
 });

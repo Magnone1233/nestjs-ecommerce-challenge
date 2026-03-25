@@ -6,4 +6,7 @@ export class PayloadDto {
 
   @IsNotEmpty()
   public id: number;
+
+  @IsNotEmpty()
+  public roleIds: number[];
 }
